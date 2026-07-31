@@ -8,7 +8,7 @@
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="./src/styles/app.css" />
-  <title>MIZUNE — Sound Visual Laboratory</title>
+  <title>MIZUNE UHD — Sound Visual Laboratory</title>
 </head>
 <body>
   <noscript>MIZUNEを使用するにはJavaScriptを有効にしてください。</noscript>
@@ -85,6 +85,24 @@
             <option value="living-canvas">Living Canvas</option>
           </select>
 
+          <label class="field-label" for="resolutionModeSelect">描画解像度</label>
+          <select id="resolutionModeSelect" class="select-field">
+            <option value="auto">自動（負荷に応じて調整）</option>
+            <option value="high">高解像度</option>
+            <option value="ultra">超高解像度</option>
+            <option value="cinema" selected>Cinematic（最高品質）</option>
+          </select>
+          <p class="setting-hint">Cinematicでは端末の画素密度と表現密度をさらに引き上げ、内部描画を最大約30MPまで使用します。重い場合は超高解像度または自動へ戻してください。</p>
+
+          <label class="field-label" for="renderEngineSelect">レンダリングエンジン</label>
+          <select id="renderEngineSelect" class="select-field">
+            <option value="full" selected>Full WebGL Scene（推奨）</option>
+            <option value="hybrid">WebGL Hybrid</option>
+            <option value="auto">自動（Cinematic時はHybrid優先）</option>
+            <option value="canvas">Canvas 2Dのみ</option>
+          </select>
+          <p class="setting-hint">Full WebGL Sceneでは、背景だけでなくメインの水面・リング・粒子風表現もGPUで描画します。不安定な場合はHybridまたはCanvasへ戻してください。</p>
+
           <label class="range-field">
             <span>反応の強さ <output id="intensityOutput">1.00</output></span>
             <input id="intensityRange" type="range" min="0.3" max="2" value="1" step="0.05" />
@@ -117,8 +135,9 @@
             <label class="switch"><input id="reducedMotionToggle" type="checkbox" /><span></span></label>
           </div>
 
-          <div class="quality-box">
-            <span><small>描画品質</small><strong id="qualityLabel">自動調整中</strong></span>
+          <div class="quality-box quality-box-uhd">
+            <span><small>描画品質</small><strong id="qualityLabel">超高精細</strong></span>
+            <span><small>内部解像度</small><strong id="resolutionLabel">計測中</strong></span>
             <span><small>FPS</small><strong id="fpsLabel">—</strong></span>
           </div>
         </aside>

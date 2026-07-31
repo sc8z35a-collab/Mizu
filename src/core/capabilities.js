@@ -10,6 +10,7 @@ export function detectCapabilities() {
     worker: Boolean(window.Worker),
     serviceWorker: 'serviceWorker' in navigator,
     fullscreen: Boolean(document.documentElement.requestFullscreen),
+    webgl2: (() => { try { const c = document.createElement('canvas'); return Boolean(c.getContext('webgl2')); } catch { return false; } })(),
     recordingTypes: supportedRecordingTypes,
     secureContext: window.isSecureContext,
     maxTouchPoints: navigator.maxTouchPoints || 0,

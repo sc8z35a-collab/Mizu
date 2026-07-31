@@ -20,6 +20,7 @@ export class AudioEngine {
     this.freqData = null;
     this.waveData = null;
     this.smoothing = 0.78;
+    this.analysisResolutionMode = 'ultra';
     this.metrics = { rms: 0, peak: 0, smoothRms: 0, bands: {}, dominantBand: '—', stereoBalance: 0 };
     this.demoNodes = [];
     this.mediaElement.addEventListener('play', () => this.bus.emit('playstate', { playing: true }));
@@ -35,7 +36,7 @@ export class AudioEngine {
     if (!this.context) {
       this.context = new AudioContextClass({ latencyHint: 'interactive' });
       this.analyser = this.context.createAnalyser();
-      this.analyser.fftSize = 2048;
+      this.analyser.fftSize = this.getFftSize();
       this.analyser.minDecibels = -95;
       this.analyser.maxDecibels = -15;
       this.analyser.smoothingTimeConstant = this.smoothing;
@@ -48,6 +49,18 @@ export class AudioEngine {
     }
     if (this.context.state === 'suspended') await this.context.resume();
     return this.context;
+  }
+
+  getFftSize() {
+    return ({ auto: 2048, high: 4096, ultra: 8192, cinema: 16384 })[this.analysisResolutionMode] || 8192;
+  }
+
+  setAnalysisResolution(mode) {
+    this.analysisResolutionMode = ['auto', 'high', 'ultra', 'cinema'].includes(mode) ? mode : 'ultra';
+    if (!this.analyser) return;
+    this.analyser.fftSize = this.getFftSize();
+    this.freqData = new Uint8Array(this.analyser.frequencyBinCount);
+    this.waveData = new Uint8Array(this.analyser.fftSize);
   }
 
   setSmoothing(value) {
@@ -178,7 +191,7 @@ export class AudioEngine {
       bands[name] = normalized;
       if (normalized > dominantValue) { dominantValue = normalized; dominantBand = name; }
     });
-    this.metrics = { rms, peak, smoothRms: this.metrics.smoothRms * 0.84 + rms * 0.16, bands, dominantBand, frequency: this.freqData, waveform: this.waveData };
+    this.metrics = { rms, peak, smoothRms: this.metrics.smoothRms * 0.84 + rms * 0.16, bands, dominantBand, frequency: this.freqData, waveform: this.waveData, spectrumBins: this.freqData.length, waveformSamples: this.waveData.length };
     return this.metrics;
   }
 

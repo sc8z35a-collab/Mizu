@@ -6,7 +6,7 @@ export class AppController {
     this.els = Object.fromEntries([...document.querySelectorAll('[id]')].map(el => [el.id, el]));
     this.tracks = []; this.currentIndex = -1; this.currentAnalysis = null; this.page = 'studio'; this.uiHidden = false; this.hideTimer = null; this.pendingMicAction = 'visualize';
     this.settings = {
-      visualMode:'waterline', intensity:1, particleDensity:.55, smoothing:.78, palette:'water-paper', plants:true, reducedMotion:false,
+      visualMode:'waterline', resolutionMode:'cinema', renderEngine:'full', intensity:1, particleDensity:.55, smoothing:.78, palette:'water-paper', plants:true, reducedMotion:false,
       recordingMime: capabilities.recordingTypes[0] || '', noiseSuppression:true, echoCancellation:true, autoGainControl:false
     };
   }
@@ -40,6 +40,8 @@ export class AppController {
     e.brandButton.onclick=()=>this.showWelcome();
     e.clearPlaylistButton.onclick=()=>{this.audio.pause();this.tracks=[];this.currentIndex=-1;this.currentAnalysis=null;this.renderPlaylist();this.renderAnalysis();this.updateTransport();this.saveSession();this.setVisualIdentity('音を待っています','マイク、音楽ファイル、またはデモ音源を選択してください。');};
     e.visualModeSelect.onchange=()=>this.updateSetting('visualMode',e.visualModeSelect.value);
+    e.resolutionModeSelect.onchange=()=>this.updateSetting('resolutionMode',e.resolutionModeSelect.value);
+    e.renderEngineSelect.onchange=()=>this.updateSetting('renderEngine',e.renderEngineSelect.value);
     e.intensityRange.oninput=()=>{e.intensityOutput.value=Number(e.intensityRange.value).toFixed(2);this.updateSetting('intensity',Number(e.intensityRange.value),false);};
     e.particleRange.oninput=()=>{e.particleOutput.value=`${e.particleRange.value}%`;this.updateSetting('particleDensity',Number(e.particleRange.value)/100,false);};
     e.smoothingRange.oninput=()=>{e.smoothingOutput.value=Number(e.smoothingRange.value).toFixed(2);this.updateSetting('smoothing',Number(e.smoothingRange.value),false);};
@@ -69,11 +71,11 @@ export class AppController {
 
   applySettings() {
     const s=this.settings,e=this.els;
-    e.visualModeSelect.value=s.visualMode;e.intensityRange.value=s.intensity;e.intensityOutput.value=Number(s.intensity).toFixed(2);
+    e.visualModeSelect.value=s.visualMode;e.resolutionModeSelect.value=s.resolutionMode||'cinema';e.renderEngineSelect.value=s.renderEngine||'full';e.intensityRange.value=s.intensity;e.intensityOutput.value=Number(s.intensity).toFixed(2);
     e.particleRange.value=Math.round(s.particleDensity*100);e.particleOutput.value=`${Math.round(s.particleDensity*100)}%`;e.smoothingRange.value=s.smoothing;e.smoothingOutput.value=Number(s.smoothing).toFixed(2);
     e.paletteSelect.value=s.palette;e.plantToggle.checked=s.plants;e.reducedMotionToggle.checked=s.reducedMotion;
     e.noiseSuppressionToggle.checked=s.noiseSuppression;e.echoCancellationToggle.checked=s.echoCancellation;e.autoGainToggle.checked=s.autoGainControl;
-    this.visuals.setMode(s.visualMode);this.visuals.setIntensity(s.intensity);this.visuals.setParticleDensity(s.particleDensity);this.visuals.setPalette(s.palette);this.visuals.setPlantsEnabled(s.plants);this.visuals.setReducedMotion(s.reducedMotion);this.audio.setSmoothing(s.smoothing);
+    this.visuals.setResolutionMode(s.resolutionMode||'cinema');this.audio.setAnalysisResolution(s.resolutionMode||'cinema');this.visuals.setRendererMode(s.renderEngine||'full');this.visuals.setMode(s.visualMode);this.visuals.setIntensity(s.intensity);this.visuals.setParticleDensity(s.particleDensity);this.visuals.setPalette(s.palette);this.visuals.setPlantsEnabled(s.plants);this.visuals.setReducedMotion(s.reducedMotion);this.audio.setSmoothing(s.smoothing);
   }
   async updateSetting(key,value,persist=true) { this.settings[key]=value; this.applySettings(); if(persist) await this.storage.setSetting('app-settings',this.settings); else this.persistSettingsDebounced(); }
   persistSettingsDebounced=debounce(()=>this.storage.setSetting('app-settings',this.settings),250);
@@ -190,7 +192,20 @@ export class AppController {
   startRecording(stream){try{this.recorder.start(stream,this.settings.recordingMime);this.els.recordButton.classList.add('is-recording');this.els.recordLabel.textContent='0:00';this.setVisualIdentity('Recording','録音中です。停止ボタンは常に表示されます。');}catch(error){this.toast(error.message,'error');}}
   async handleRecordState(state){if(state.state==='stopped'&&state.blob){this.els.recordButton.classList.remove('is-recording');this.els.recordLabel.textContent='REC';const stamp=new Date().toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});const track={id:uid('recording'),title:`録音 ${stamp}`,originalFileName:null,sourceType:'recording',mimeType:state.mimeType,duration:state.duration,fileSize:state.blob.size,createdAt:Date.now(),updatedAt:Date.now(),tags:['録音'],favorite:false,blob:state.blob};await this.storage.putTrack(track);this.tracks.push(track);await this.refreshLibraryCache();this.renderPlaylist();this.renderLibrary();await this.selectTrack(this.tracks.length-1);this.toast('録音をブラウザ内へ保存しました。');await this.refreshStorageUsage();}}
 
-  updateLiveMetrics(m){this.els.rmsValue.textContent=(m.rms||0).toFixed(3);this.els.peakValue.textContent=(m.peak||0).toFixed(3);this.els.bandValue.textContent=m.dominantBand||'—';this.els.fpsLabel.textContent=`${m.fps||0}`;this.els.qualityLabel.textContent=m.quality>.88?'高品質':m.quality>.65?'標準':m.quality>.45?'省負荷':'最低負荷';document.documentElement.style.setProperty('--audio-energy',clamp((m.smoothRms||0)*4,0,1));}
+  updateLiveMetrics(m){
+    this.els.rmsValue.textContent=(m.rms||0).toFixed(3);
+    this.els.peakValue.textContent=(m.peak||0).toFixed(3);
+    this.els.bandValue.textContent=m.dominantBand||'—';
+    this.els.fpsLabel.textContent=`${m.fps||0}`;
+    const modeLabel={cinema:'Cinematic',ultra:'超高精細',high:'高精細',auto:'自動調整'}[m.resolutionMode]||'描画中';
+    const rendererLabel=m.webglActive ? (m.rendererPipeline==='full' ? 'Full WebGL' : 'WebGL Hybrid') : 'Canvas 2D';
+    this.els.qualityLabel.textContent=`${modeLabel} / ${rendererLabel} ×${Number(m.quality||1).toFixed(2)}`;
+    this.els.resolutionLabel.textContent=m.pixelWidth&&m.pixelHeight
+      ?`${m.pixelWidth.toLocaleString()}×${m.pixelHeight.toLocaleString()} · ${Number(m.renderMegapixels||0).toFixed(1)}MP${m.resolutionLimited?'*':''}`
+      :'—';
+    this.els.resolutionLabel.title=`${m.resolutionLimited?'安全上限に合わせて内部解像度を調整中。 ':''}FFT ${Number(m.spectrumBins||0).toLocaleString()} bins / 波形 ${Number(m.waveformSamples||0).toLocaleString()} samples`;
+    document.documentElement.style.setProperty('--audio-energy',clamp((m.smoothRms||0)*4,0,1));
+  }
 
   navigate(page){this.page=page;document.querySelectorAll('.page').forEach(el=>el.classList.toggle('is-active',el.dataset.page===page));document.querySelectorAll('[data-page-target]').forEach(el=>el.classList.toggle('is-active',el.dataset.pageTarget===page));this.els.app.dataset.page=page;if(page==='library')this.renderLibrary();if(page==='analysis')this.renderAnalysis();this.resetAutoHide();}
   toggleCompact(){this.uiHidden=!this.uiHidden;this.els.app.classList.toggle('ui-compact',this.uiHidden);}
@@ -207,7 +222,17 @@ export class AppController {
     this.els.segmentList.querySelectorAll('.segment-card').forEach(card=>card.querySelector('button').onclick=()=>{const s=a.segments[Number(card.dataset.segment)];this.audio.seek(s.startTime);this.audio.play();this.navigate('studio');});this.drawOverview(a);
   }
   segmentLabel(type){return({silence:'無音',quiet:'静か',loud:'大音量',peak:'ピーク',low:'低音優勢',mid:'中音優勢',high:'高音優勢'})[type]||type;}
-  drawOverview(a){const canvas=this.els.overviewCanvas,rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.max(1,rect.width*dpr);canvas.height=180*dpr;const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);const w=rect.width,h=180;ctx.clearRect(0,0,w,h);ctx.fillStyle='rgba(255,255,255,.14)';ctx.fillRect(0,0,w,h);if(!a)return;ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--ink').trim()||'#596c67';ctx.globalAlpha=.58;ctx.beginPath();a.waveform.forEach(([min,max],i)=>{const x=i/(a.waveform.length-1)*w;ctx.moveTo(x,h/2+min*h*.42);ctx.lineTo(x,h/2+max*h*.42);});ctx.stroke();const colors={silence:'rgba(143,175,180,.10)',quiet:'rgba(191,216,220,.12)',loud:'rgba(116,139,121,.13)',peak:'rgba(180,130,110,.14)',low:'rgba(116,139,121,.11)',mid:'rgba(216,204,183,.14)',high:'rgba(191,216,220,.16)'};a.segments.forEach(s=>{ctx.fillStyle=colors[s.type]||'rgba(0,0,0,.04)';ctx.fillRect(s.startTime/a.duration*w,0,(s.endTime-s.startTime)/a.duration*w,h);});}
+  drawOverview(a){
+    const canvas=this.els.overviewCanvas,rect=canvas.getBoundingClientRect(),w=Math.max(1,rect.width),h=180;
+    const render=this.visuals.getSuggestedScale(w,h,4_000_000);
+    canvas.width=render.pixelWidth;canvas.height=render.pixelHeight;
+    const ctx=canvas.getContext('2d');ctx.setTransform(render.scale,0,0,render.scale,0,0);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+    ctx.clearRect(0,0,w,h);ctx.fillStyle='rgba(255,255,255,.14)';ctx.fillRect(0,0,w,h);if(!a)return;
+    ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--ink').trim()||'#596c67';ctx.globalAlpha=.58;ctx.lineWidth=.85;ctx.beginPath();
+    a.waveform.forEach(([min,max],i)=>{const x=i/(a.waveform.length-1)*w;ctx.moveTo(x,h/2+min*h*.42);ctx.lineTo(x,h/2+max*h*.42);});ctx.stroke();
+    const colors={silence:'rgba(143,175,180,.10)',quiet:'rgba(191,216,220,.12)',loud:'rgba(116,139,121,.13)',peak:'rgba(180,130,110,.14)',low:'rgba(116,139,121,.11)',mid:'rgba(216,204,183,.14)',high:'rgba(191,216,220,.16)'};
+    a.segments.forEach(s=>{ctx.fillStyle=colors[s.type]||'rgba(0,0,0,.04)';ctx.fillRect(s.startTime/a.duration*w,0,(s.endTime-s.startTime)/a.duration*w,h);});
+  }
   seekFromOverview(event){if(!this.currentAnalysis)return;const rect=this.els.overviewCanvas.getBoundingClientRect();this.audio.seek(clamp((event.clientX-rect.left)/rect.width,0,1)*this.currentAnalysis.duration);}
 
   async renderLibrary(){await this.refreshLibraryCache();const query=(this.els.librarySearch?.value||'').toLowerCase();const filter=this.els.libraryFilter?.value||'all';const list=this.libraryTracks.filter(t=>(!query||`${t.title} ${t.originalFileName||''} ${(t.tags||[]).join(' ')}`.toLowerCase().includes(query))&&(filter==='all'||filter===t.sourceType||(filter==='favorite'&&t.favorite)));
@@ -219,7 +244,7 @@ export class AppController {
   async deleteAllData(){if(!confirm('MIZUNEが保存した音源、録音、解析、設定をすべて削除します。元に戻せません。'))return;await this.storage.clearAll();this.tracks=[];this.libraryTracks=[];this.currentIndex=-1;await this.saveSession();this.currentAnalysis=null;this.renderPlaylist();this.renderLibrary();this.renderAnalysis();this.updateTransport();this.toast('ブラウザ内のMIZUNEデータを削除しました。');await this.refreshStorageUsage();}
   async clearAnalysisCache(){await this.storage.clearAnalyses();this.currentAnalysis=null;this.renderAnalysis();this.toast('解析キャッシュを削除しました。');}
 
-  renderCapabilities(){const c=this.capabilities;const rows=[['安全な接続',c.secureContext],['Web Audio',c.webAudio],['マイク',c.microphone],['録音',c.mediaRecorder],['IndexedDB',c.indexedDB],['Web Worker',c.worker],['PWA',c.serviceWorker],['全画面',c.fullscreen]];this.els.capabilityList.innerHTML=rows.map(([name,ok])=>`<span><strong>${name}</strong><b class="${ok?'ok':'ng'}">${ok?'利用可能':'非対応'}</b></span>`).join('')+`<p>CPU論理コア: ${c.hardwareConcurrency||'不明'} / 推定メモリ: ${c.deviceMemory?`${c.deviceMemory} GB`:'取得不可'}</p>`;}
+  renderCapabilities(){const c=this.capabilities;const rows=[['安全な接続',c.secureContext],['Web Audio',c.webAudio],['WebGL 2',c.webgl2],['マイク',c.microphone],['録音',c.mediaRecorder],['IndexedDB',c.indexedDB],['Web Worker',c.worker],['PWA',c.serviceWorker],['全画面',c.fullscreen]];this.els.capabilityList.innerHTML=rows.map(([name,ok])=>`<span><strong>${name}</strong><b class="${ok?'ok':'ng'}">${ok?'利用可能':'非対応'}</b></span>`).join('')+`<p>CPU論理コア: ${c.hardwareConcurrency||'不明'} / 推定メモリ: ${c.deviceMemory?`${c.deviceMemory} GB`:'取得不可'}</p>`;}
   renderRecordingTypes(){const types=this.capabilities.recordingTypes;this.els.recordingMime.innerHTML=types.length?types.map(type=>`<option value="${type}">${type}</option>`):'<option value="">ブラウザ既定</option>';this.els.recordingMime.value=types.includes(this.settings.recordingMime)?this.settings.recordingMime:(types[0]||'');this.settings.recordingMime=this.els.recordingMime.value;}
   async refreshStorageUsage(){if(!navigator.storage?.estimate){this.els.storageUsage.textContent='保存容量情報は取得できません。';return;}const {usage=0,quota=0}=await navigator.storage.estimate();this.els.storageUsage.textContent=`使用中 ${formatBytes(usage)} / 利用可能上限の目安 ${formatBytes(quota)}`;}
   exportSettings(){const blob=new Blob([JSON.stringify(this.settings,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mizune-settings.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}

@@ -1,39 +1,69 @@
-# MIZUNE 実装・検証記録
+# MIZUNE v1.4.0 FULL WEBGL SCENE 実装レポート
 
-## 実装構成
+## 概要
+v1.3.0 WEBGL Hybrid をベースに、より踏み込んだ Full WebGL Scene 版を実装した。
+これまでの「背景だけGPU」から進め、メインの音反応表現も WebGL 2 フラグメントシェーダーで描く構成を追加した。
 
-- 依存ライブラリなしのES Modules構成
-- 19以上の分割ファイル
-- Web Audio APIによるリアルタイム解析
-- MediaRecorderによる録音
-- IndexedDBによる音源・録音・解析結果・設定保存
-- Web Workerによるオフライン区間分析
-- Canvas 2Dによる8種類の表現
-- Service Worker / Web App Manifest
-- Windows用ローカルサーバー起動スクリプト
+## 主な変更点
 
-## 実施した検査
+### 1. 新規レンダラー `webgl-scene-renderer.js`
+- フルスクリーントライアングル + フラグメントシェーダーで描画
+- 背景水面、紙、コースティクス風光表現をGPU描画
+- 音反応するメインビジュアルをモード別にGPU描画
+- 最大6個のメタボール風水滴をGPU側で合成
 
-- 全JavaScriptファイルの `node --check`
-- Web App ManifestのJSON構文検査
-- Python起動スクリプトのコンパイル検査
-- HTML内IDの重複検査
-- UIコントローラーが参照するIDの存在検査
-- 全ローカル参照資源のHTTP 200応答確認
-- 人工音声を用いた解析Workerのスモークテスト
-- マイク入力がスピーカー出力へ直結しない配線確認
+### 2. WebGLで描画するモード別シーン
+- Waterline
+  - 水面ライン
+  - 水体の厚み
+  - 反射線
+  - 波紋
+- Circular Garden
+  - リング
+  - 放射状スポーク
+  - コアハロー
+- Paper Wave
+  - 複数の紙帯状レイヤー
+- Glass Orbit
+  - 軌道上のガラス泡風表現
+- Ink Bloom
+  - にじみ状のインク雲
+- Particle Pond
+  - 粒子の漂い風パターン
+- Minimal Scope
+  - 波線とバー表示
 
-## 制約
+### 3. VisualEngine 改修
+- レンダリングエンジンを以下に再構成
+  - Full WebGL Scene
+  - WebGL Hybrid
+  - Auto
+  - Canvas 2D
+- Full WebGL Scene では、Canvasの役割を補助レイヤー中心へ変更
+- Hybridでは従来通りCanvas 2D主体 + WebGL背景
 
-この作業環境のChromiumには、組織ポリシーによりlocalhostとfile URLの表示が禁止されていました。そのため、実ブラウザ上の最終クリック操作、マイク許可、MediaRecorder実録音のE2E試験は実施できていません。ソース構文、資源配信、解析アルゴリズムは個別に検証済みです。
+### 4. UI改修
+- 設定欄のレンダリングエンジンを更新
+- 初期値を `Full WebGL Scene` に変更
+- ライブ指標へ `Full WebGL / WebGL Hybrid / Canvas 2D` 表示
 
-実機では `start_windows.bat` から起動し、ChromeまたはEdgeの最新版で確認してください。
+### 5. Service Worker更新
+- 新しい `webgl-scene-renderer.js` をキャッシュ対象へ追加
+- キャッシュ名を更新
 
-## v1.0.1 マイク画面修正（2026-07-31）
+## できるようになったこと
+- 従来より“全面的”なWebGL描画
+- 背景だけでなく主役のシーンもGPU描画
+- 豪華さの向上
+- Waterline / Circular / Glass / Pond 系の質感向上
 
-- `hidden` 属性が `.modal-backdrop { display:grid }` に上書きされ、マイク説明画面が閉じない不具合を修正。
-- `[hidden] { display:none !important; }` を追加し、初期状態・キャンセル・許可成功時に確実に非表示化。
-- 権限取得中、拒否、マイク未検出、他アプリ使用中、非HTTPSの状態説明を追加。
-- マイクを使用できない場合でも、音楽ファイルまたはデモ音源へ移動可能に変更。
-- Service Workerのキャッシュ世代を更新。
-- 既存サーバーとのポート衝突時に、4173〜4192から空きポートを自動選択するよう起動処理を修正。
+## 限界と注意
+- 依然として UI 全体までWebGL化したわけではない
+- 物理ベース流体や本格3Dガラスではない
+- WebGL 2 非対応環境では自動フォールバック
+- Full WebGL Scene は端末負荷が高い可能性がある
+
+## 検証
+- 全JS `node --check` 通過
+- `analysis-worker-smoke.cjs` 通過
+- `resolution-profile-smoke.mjs` 通過
