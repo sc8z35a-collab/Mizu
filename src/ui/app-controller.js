@@ -24,9 +24,11 @@ export class AppController {
     const e=this.els;
     e.welcomeFileButton.onclick=()=>{this.closeWelcome();e.fileInput.click();};
     e.welcomeMicButton.onclick=()=>{this.pendingMicAction='visualize';this.showPermissionDialog();};
-    e.welcomeDemoButton.onclick=async()=>{this.closeWelcome();await this.audio.startDemo();this.setVisualIdentity('Water Garden Demo','合成音をリアルタイム可視化しています');};
+    e.welcomeDemoButton.onclick=async()=>{this.closeWelcome();await this.startDemoSafely();};
     e.confirmPermissionButton.onclick=()=>this.enableMicrophone(this.pendingMicAction);
     e.cancelPermissionButton.onclick=()=>this.hidePermissionDialog();
+    e.permissionFileButton.onclick=()=>{this.hidePermissionDialog();e.fileInput.click();};
+    e.permissionDemoButton.onclick=async()=>{this.hidePermissionDialog();await this.startDemoSafely();};
     e.addFilesButton.onclick=()=>e.fileInput.click(); e.libraryImportButton.onclick=()=>e.fileInput.click(); e.welcomeFileButton.onclick=()=>{this.closeWelcome();e.fileInput.click();};
     e.fileInput.onchange=event=>this.importFiles([...event.target.files]);
     e.playButton.onclick=()=>this.togglePlay(); e.previousButton.onclick=()=>this.selectRelative(-1); e.nextButton.onclick=()=>this.selectRelative(1);
@@ -114,12 +116,75 @@ export class AppController {
   updateTime({currentTime=0,duration=0}){this.els.timeLabel.textContent=`${formatTime(currentTime)} / ${formatTime(duration)}`;this.els.seekRange.value=duration?Math.round(currentTime/duration*1000):0;}
   setVisualIdentity(title,subtitle){this.els.visualTitle.textContent=title;this.els.visualSubtitle.textContent=subtitle;this.els.idleMessage.classList.add('has-source');}
 
-  showPermissionDialog(){this.closeWelcome();this.els.permissionDialog.hidden=false;}
-  hidePermissionDialog(){this.els.permissionDialog.hidden=true;}
+  showPermissionDialog(){
+    this.closeWelcome();
+    const e=this.els;
+    e.permissionDialog.hidden=false;
+    e.permissionStatus.className='permission-status';
+    e.confirmPermissionButton.disabled=false;
+    e.confirmPermissionButton.textContent='マイクを許可';
+    if(!window.isSecureContext){
+      e.permissionStatus.textContent='この接続ではマイクを使用できません。HTTPSまたはlocalhostで開くか、音楽ファイル／デモ音源を使用してください。';
+      e.permissionStatus.classList.add('is-error');
+      e.confirmPermissionButton.disabled=true;
+    }else if(!navigator.mediaDevices?.getUserMedia){
+      e.permissionStatus.textContent='このブラウザではマイク入力を利用できません。ブラウザを更新するか、音楽ファイル／デモ音源を使用してください。';
+      e.permissionStatus.classList.add('is-error');
+      e.confirmPermissionButton.disabled=true;
+    }else{
+      e.permissionStatus.textContent='「マイクを許可」を押すと、ブラウザの確認画面が表示されます。';
+    }
+  }
+  hidePermissionDialog(){
+    const e=this.els;
+    e.permissionDialog.hidden=true;
+    e.confirmPermissionButton.disabled=false;
+    e.confirmPermissionButton.textContent='マイクを許可';
+    e.permissionStatus.className='permission-status';
+  }
+  async startDemoSafely(){
+    try{await this.audio.startDemo();this.setVisualIdentity('Water Garden Demo','合成音をリアルタイム可視化しています');this.resetAutoHide();}
+    catch(error){this.toast(error.message||'デモ音源を開始できませんでした。','error');}
+  }
+  microphoneErrorMessage(error){
+    const messages={
+      NotAllowedError:'マイクの使用が拒否されています。アドレスバー付近のサイト設定からマイクを許可し、もう一度実行してください。',
+      PermissionDeniedError:'マイクの使用が拒否されています。ブラウザのサイト設定を確認してください。',
+      NotFoundError:'利用できるマイクが見つかりません。端末のマイクや接続機器を確認してください。',
+      DevicesNotFoundError:'利用できるマイクが見つかりません。',
+      NotReadableError:'マイクを開始できません。他のアプリがマイクを使用していないか確認してください。',
+      TrackStartError:'マイクを開始できません。他のアプリが使用中の可能性があります。',
+      SecurityError:'安全でない接続のためマイクを使用できません。HTTPSまたはlocalhostで開いてください。',
+      AbortError:'マイクの開始が中断されました。もう一度試してください。',
+      OverconstrainedError:'指定した録音条件をこの端末で使用できません。設定を変更して再試行してください。'
+    };
+    return messages[error?.name]||error?.message||'マイクを開始できませんでした。';
+  }
   async enableMicrophone(action='visualize'){
-    this.hidePermissionDialog();
-    try { const stream=await this.audio.useMicrophone(this.settings);this.setVisualIdentity('Microphone Input','リアルタイム音声を端末内で解析しています');this.els.micButton.classList.add('is-active');if(action==='record')this.startRecording(stream);this.toast('マイク入力を開始しました。'); }
-    catch(error){const message=error.name==='NotAllowedError'?'マイクの使用が許可されませんでした。ブラウザのサイト設定を確認してください。':error.message||'マイクを開始できませんでした。';this.toast(message,'error');}
+    const e=this.els;
+    if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia){this.showPermissionDialog();return;}
+    e.confirmPermissionButton.disabled=true;
+    e.confirmPermissionButton.textContent='許可を確認中…';
+    e.permissionStatus.className='permission-status';
+    e.permissionStatus.textContent='ブラウザのマイク確認画面で「許可」を選択してください。確認画面が背後に表示されていないかも確認してください。';
+    try {
+      const stream=await this.audio.useMicrophone(this.settings);
+      e.permissionStatus.textContent='マイクを開始しました。';
+      e.permissionStatus.classList.add('is-success');
+      this.hidePermissionDialog();
+      this.setVisualIdentity('Microphone Input','リアルタイム音声を端末内で解析しています');
+      this.els.micButton.classList.add('is-active');
+      if(action==='record')this.startRecording(stream);
+      this.toast('マイク入力を開始しました。');
+      this.resetAutoHide();
+    } catch(error){
+      const message=this.microphoneErrorMessage(error);
+      e.confirmPermissionButton.disabled=false;
+      e.confirmPermissionButton.textContent='もう一度試す';
+      e.permissionStatus.textContent=message;
+      e.permissionStatus.className='permission-status is-error';
+      this.toast(message,'error');
+    }
   }
   async toggleRecording(){if(this.recorder.isRecording){await this.recorder.stop();return;}if(!this.audio.stream){this.pendingMicAction='record';this.showPermissionDialog();}else this.startRecording(this.audio.stream);}
   startRecording(stream){try{this.recorder.start(stream,this.settings.recordingMime);this.els.recordButton.classList.add('is-recording');this.els.recordLabel.textContent='0:00';this.setVisualIdentity('Recording','録音中です。停止ボタンは常に表示されます。');}catch(error){this.toast(error.message,'error');}}

@@ -1,0 +1,10 @@
+MIZUNE Sound Visual Laboratory
+Version: 1.0.1-permission-fix
+Build date: 2026-07-31
+
+主な修正:
+- 「マイクへのアクセス」画面が閉じない不具合を修正
+- 権限取得中・拒否・非HTTPS・マイク未検出の説明を追加
+- 音楽ファイル／デモ音源への代替導線を追加
+- PWAキャッシュを更新
+- ローカルサーバーのポート衝突を自動回避

@@ -1,15 +1,39 @@
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
-import os, webbrowser
+import os
+import socket
+import webbrowser
 
 ROOT = Path(__file__).resolve().parent
-PORT = 4173
+HOST = "127.0.0.1"
+PORT_CANDIDATES = range(4173, 4193)
+
+
+def choose_port() -> int:
+    for port in PORT_CANDIDATES:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            try:
+                probe.bind((HOST, port))
+            except OSError:
+                continue
+            return port
+    raise RuntimeError("使用可能なローカルポートが見つかりませんでした。")
+
+
 os.chdir(ROOT)
-url = f"http://127.0.0.1:{PORT}"
-print(f"MIZUNE: {url}")
+port = choose_port()
+server = ThreadingHTTPServer((HOST, port), SimpleHTTPRequestHandler)
+url = f"http://{HOST}:{port}"
+print(f"MIZUNE 修正版: {url}")
 print("終了するには Ctrl+C を押してください。")
 try:
     webbrowser.open(url)
 except Exception:
     pass
-ThreadingHTTPServer(("127.0.0.1", PORT), SimpleHTTPRequestHandler).serve_forever()
+
+try:
+    server.serve_forever()
+except KeyboardInterrupt:
+    print("\nMIZUNEを終了します。")
+finally:
+    server.server_close()

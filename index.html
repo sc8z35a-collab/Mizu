@@ -227,10 +227,15 @@
     </section>
 
     <section id="permissionDialog" class="modal-backdrop" hidden>
-      <div class="modal-card paper-panel" role="dialog" aria-modal="true" aria-labelledby="permissionTitle">
+      <div class="modal-card paper-panel" role="dialog" aria-modal="true" aria-labelledby="permissionTitle" aria-describedby="permissionDescription permissionStatus">
         <h2 id="permissionTitle">マイクへのアクセス</h2>
-        <p>リアルタイム可視化または録音のために使用します。録音開始は別操作で、取得した音声を自動送信しません。</p>
-        <div class="modal-actions"><button id="cancelPermissionButton" class="quiet-button" type="button">キャンセル</button><button id="confirmPermissionButton" class="primary-button" type="button">マイクを許可</button></div>
+        <p id="permissionDescription">リアルタイム可視化または録音のために使用します。録音開始は別操作で、取得した音声を自動送信しません。</p>
+        <p id="permissionStatus" class="permission-status" role="status">「マイクを許可」を押すと、ブラウザの確認画面が表示されます。</p>
+        <div class="permission-alternatives">
+          <button id="permissionFileButton" class="soft-button" type="button">音楽ファイルを開く</button>
+          <button id="permissionDemoButton" class="quiet-button" type="button">デモ音源で続ける</button>
+        </div>
+        <div class="modal-actions"><button id="cancelPermissionButton" class="quiet-button" type="button">閉じる</button><button id="confirmPermissionButton" class="primary-button" type="button">マイクを許可</button></div>
       </div>
     </section>
 

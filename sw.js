@@ -1,4 +1,4 @@
-const CACHE = 'mizune-v1.0.0';
+const CACHE = 'mizune-v1.0.1-permission-fix';
 const ASSETS = [
   './','./index.html','./manifest.webmanifest','./assets/icon.svg',
   './src/main.js','./src/styles/app.css','./src/core/event-bus.js','./src/core/audio-engine.js',
