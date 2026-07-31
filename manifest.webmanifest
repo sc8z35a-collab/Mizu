@@ -1,0 +1,13 @@
+{
+  "name": "MIZUNE — Sound Visual Laboratory",
+  "short_name": "MIZUNE",
+  "description": "音を水・紙・ガラス・植物の2D表現へ変換するローカルファースト音響ビジュアルスタジオ",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f7f2",
+  "theme_color": "#f7f7f2",
+  "icons": [
+    {"src":"./assets/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}

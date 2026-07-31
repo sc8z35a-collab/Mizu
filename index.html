@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f7f7f2" />
+  <meta name="description" content="音を水・紙・ガラス・植物の2D表現へ変換するローカルファースト音響ビジュアルスタジオ" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="./src/styles/app.css" />
+  <title>MIZUNE — Sound Visual Laboratory</title>
+</head>
+<body>
+  <noscript>MIZUNEを使用するにはJavaScriptを有効にしてください。</noscript>
+
+  <div id="app" class="app-shell" data-page="studio">
+    <canvas id="visualCanvas" class="visual-canvas" aria-label="音声ビジュアル表示"></canvas>
+    <div id="paperTexture" class="paper-texture" aria-hidden="true"></div>
+    <div id="ambientLight" class="ambient-light" aria-hidden="true"></div>
+
+    <header id="topBar" class="top-bar glass-panel">
+      <button id="brandButton" class="brand-button" type="button" aria-label="ホームを開く">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span><strong>MIZUNE</strong><small>Sound Visual Laboratory</small></span>
+      </button>
+      <nav class="page-tabs" aria-label="主要画面">
+        <button class="tab-button is-active" data-page-target="studio" type="button">Studio</button>
+        <button class="tab-button" data-page-target="analysis" type="button">Analysis</button>
+        <button class="tab-button" data-page-target="library" type="button">Library</button>
+        <button class="tab-button" data-page-target="settings" type="button">Settings</button>
+      </nav>
+      <div class="top-actions">
+        <button id="compactToggle" class="icon-button" type="button" aria-label="操作UIを格納" title="操作UIを格納">◌</button>
+        <button id="fullscreenButton" class="icon-button" type="button" aria-label="全画面表示" title="全画面表示">⛶</button>
+      </div>
+    </header>
+
+    <main class="main-area">
+      <section id="studioPage" class="page page-studio is-active" data-page="studio">
+        <aside id="playlistPanel" class="side-panel side-panel-left glass-panel">
+          <div class="panel-heading">
+            <div><small>Current session</small><h2>プレイリスト</h2></div>
+            <button id="closePlaylistPanel" class="icon-button mobile-only" type="button" aria-label="閉じる">×</button>
+          </div>
+          <div class="panel-tools">
+            <button id="addFilesButton" class="soft-button" type="button">音源を追加</button>
+            <button id="clearPlaylistButton" class="quiet-button" type="button">一覧を解除</button>
+          </div>
+          <input id="fileInput" type="file" accept="audio/*,.flac" multiple hidden />
+          <div id="playlistList" class="track-list" aria-live="polite"></div>
+          <div id="dropHint" class="drop-hint">
+            <span class="drop-icon" aria-hidden="true"></span>
+            <p>音声ファイルをここへドロップ</p>
+          </div>
+        </aside>
+
+        <section class="studio-center">
+          <div id="idleMessage" class="center-message">
+            <span class="water-drop" aria-hidden="true"></span>
+            <p id="visualTitle">音を待っています</p>
+            <small id="visualSubtitle">マイク、音楽ファイル、またはデモ音源を選択してください。</small>
+          </div>
+          <div id="liveReadout" class="live-readout" aria-live="polite">
+            <span><small>RMS</small><strong id="rmsValue">0.000</strong></span>
+            <span><small>PEAK</small><strong id="peakValue">0.000</strong></span>
+            <span><small>DOMINANT</small><strong id="bandValue">—</strong></span>
+          </div>
+        </section>
+
+        <aside id="settingsPanel" class="side-panel side-panel-right glass-panel">
+          <div class="panel-heading">
+            <div><small>Visual response</small><h2>表現設定</h2></div>
+            <button id="closeSettingsPanel" class="icon-button mobile-only" type="button" aria-label="閉じる">×</button>
+          </div>
+
+          <label class="field-label" for="visualModeSelect">ビジュアルモード</label>
+          <select id="visualModeSelect" class="select-field">
+            <option value="waterline">Waterline</option>
+            <option value="circular-garden">Circular Garden</option>
+            <option value="paper-wave">Paper Wave</option>
+            <option value="glass-orbit">Glass Orbit</option>
+            <option value="ink-bloom">Ink Bloom</option>
+            <option value="particle-pond">Particle Pond</option>
+            <option value="minimal-scope">Minimal Scope</option>
+            <option value="living-canvas">Living Canvas</option>
+          </select>
+
+          <label class="range-field">
+            <span>反応の強さ <output id="intensityOutput">1.00</output></span>
+            <input id="intensityRange" type="range" min="0.3" max="2" value="1" step="0.05" />
+          </label>
+
+          <label class="range-field">
+            <span>粒子密度 <output id="particleOutput">55%</output></span>
+            <input id="particleRange" type="range" min="0" max="100" value="55" step="1" />
+          </label>
+
+          <label class="range-field">
+            <span>平滑化 <output id="smoothingOutput">0.78</output></span>
+            <input id="smoothingRange" type="range" min="0" max="0.95" value="0.78" step="0.01" />
+          </label>
+
+          <label class="field-label" for="paletteSelect">素材パレット</label>
+          <select id="paletteSelect" class="select-field">
+            <option value="water-paper">水と白紙</option>
+            <option value="moss-glass">苔とガラス</option>
+            <option value="sand-fiber">砂と繊維</option>
+            <option value="moon-water">月光と水面</option>
+          </select>
+
+          <div class="switch-row">
+            <span><strong>植物レイヤー</strong><small>中音域に反応する線画</small></span>
+            <label class="switch"><input id="plantToggle" type="checkbox" checked /><span></span></label>
+          </div>
+          <div class="switch-row">
+            <span><strong>動きを減らす</strong><small>粒子・溶解表現を抑制</small></span>
+            <label class="switch"><input id="reducedMotionToggle" type="checkbox" /><span></span></label>
+          </div>
+
+          <div class="quality-box">
+            <span><small>描画品質</small><strong id="qualityLabel">自動調整中</strong></span>
+            <span><small>FPS</small><strong id="fpsLabel">—</strong></span>
+          </div>
+        </aside>
+      </section>
+
+      <section id="analysisPage" class="page page-analysis" data-page="analysis">
+        <div class="analysis-layout">
+          <header class="section-header">
+            <div><small>Offline segment analysis</small><h1>音声区間分析</h1><p id="analysisLead">音源を選択すると、音量・無音・主要音域の変化を端末内で解析します。</p></div>
+            <button id="analyzeCurrentButton" class="primary-button" type="button">現在の音源を解析</button>
+          </header>
+          <section class="analysis-overview glass-panel">
+            <canvas id="overviewCanvas" height="180" aria-label="音声全体波形"></canvas>
+            <div id="analysisCursor" class="analysis-cursor" hidden></div>
+          </section>
+          <div id="analysisStats" class="stat-grid"></div>
+          <section class="segment-section">
+            <div class="subheading"><h2>検出区間</h2><span id="segmentCount">0 sections</span></div>
+            <div id="segmentList" class="segment-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="libraryPage" class="page page-library" data-page="library">
+        <div class="library-layout">
+          <header class="section-header">
+            <div><small>Local audio archive</small><h1>ライブラリ</h1><p>読み込んだ音源と録音は、このブラウザ内に保存できます。</p></div>
+            <div class="header-actions"><button id="libraryImportButton" class="soft-button" type="button">音源を読み込む</button><button id="deleteAllButton" class="danger-button" type="button">全データ削除</button></div>
+          </header>
+          <div class="library-filters glass-panel">
+            <input id="librarySearch" class="text-field" type="search" placeholder="タイトル・ファイル名・タグを検索" />
+            <select id="libraryFilter" class="select-field">
+              <option value="all">すべて</option>
+              <option value="file">音楽ファイル</option>
+              <option value="recording">録音</option>
+              <option value="favorite">お気に入り</option>
+            </select>
+          </div>
+          <div id="libraryGrid" class="library-grid"></div>
+        </div>
+      </section>
+
+      <section id="settingsPage" class="page page-settings" data-page="settings">
+        <div class="settings-layout">
+          <header class="section-header">
+            <div><small>Environment & privacy</small><h1>設定と診断</h1><p>端末能力、保存、プライバシー、操作性を管理します。</p></div>
+          </header>
+          <div class="settings-grid">
+            <section class="settings-card glass-panel"><h2>対応状況</h2><div id="capabilityList" class="capability-list"></div></section>
+            <section class="settings-card glass-panel">
+              <h2>録音</h2>
+              <label class="field-label" for="recordingMime">保存形式</label><select id="recordingMime" class="select-field"></select>
+              <div class="switch-row"><span><strong>ノイズ抑制</strong><small>ブラウザ対応時のみ</small></span><label class="switch"><input id="noiseSuppressionToggle" type="checkbox" checked /><span></span></label></div>
+              <div class="switch-row"><span><strong>エコー抑制</strong><small>モニター時の回り込みを軽減</small></span><label class="switch"><input id="echoCancellationToggle" type="checkbox" checked /><span></span></label></div>
+              <div class="switch-row"><span><strong>自動ゲイン</strong><small>入力音量を自動調整</small></span><label class="switch"><input id="autoGainToggle" type="checkbox" /><span></span></label></div>
+            </section>
+            <section class="settings-card glass-panel">
+              <h2>保存</h2>
+              <p id="storageUsage">保存容量を確認しています。</p>
+              <button id="exportSettingsButton" class="soft-button" type="button">設定を書き出す</button>
+              <label class="soft-button file-label">設定を読み込む<input id="importSettingsInput" type="file" accept="application/json" hidden /></label>
+              <button id="clearCacheButton" class="quiet-button" type="button">解析キャッシュを削除</button>
+            </section>
+            <section class="settings-card glass-panel">
+              <h2>操作</h2>
+              <div class="shortcut-list"><span><kbd>Space</kbd> 再生 / 一時停止</span><span><kbd>R</kbd> 録音</span><span><kbd>F</kbd> 全画面</span><span><kbd>V</kbd> 表現切替</span><span><kbd>← / →</kbd> 5秒移動</span><span><kbd>Esc</kbd> パネルを閉じる</span></div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <section id="transportBar" class="transport-bar glass-panel" aria-label="再生操作">
+      <button id="playlistToggle" class="icon-button" type="button" aria-label="プレイリストを開く">☷</button>
+      <div class="transport-main">
+        <div class="transport-buttons">
+          <button id="previousButton" class="icon-button" type="button" aria-label="前の音源">‹</button>
+          <button id="playButton" class="play-button" type="button" aria-label="再生">▶</button>
+          <button id="nextButton" class="icon-button" type="button" aria-label="次の音源">›</button>
+        </div>
+        <div class="track-progress">
+          <div class="track-meta"><strong id="currentTrackTitle">音源未選択</strong><span id="timeLabel">0:00 / 0:00</span></div>
+          <input id="seekRange" type="range" min="0" max="1000" value="0" step="1" aria-label="再生位置" />
+        </div>
+      </div>
+      <div class="transport-actions">
+        <button id="micButton" class="soft-icon-button" type="button" aria-label="マイク入力">MIC</button>
+        <button id="recordButton" class="record-button" type="button" aria-label="録音開始"><span></span><b id="recordLabel">REC</b></button>
+        <button id="settingsToggle" class="icon-button" type="button" aria-label="表現設定を開く">◫</button>
+      </div>
+    </section>
+
+    <section id="welcomeDialog" class="welcome-dialog" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+      <div class="welcome-card paper-panel">
+        <span class="welcome-orbit" aria-hidden="true"></span>
+        <small>LOCAL-FIRST AUDIO VISUALIZER</small>
+        <h1 id="welcomeTitle">音を、水辺の風景へ。</h1>
+        <p>マイクや音楽ファイルを、波形・円形スペクトラム・粒子・植物の2D表現へ変換します。音声は初期設定では外部へ送信されません。</p>
+        <div class="welcome-actions">
+          <button id="welcomeMicButton" class="primary-button" type="button">マイクを使う</button>
+          <button id="welcomeFileButton" class="soft-button" type="button">音楽ファイルを開く</button>
+          <button id="welcomeDemoButton" class="quiet-button" type="button">デモ音源で試す</button>
+        </div>
+        <label class="privacy-note"><input id="skipWelcomeToggle" type="checkbox" /> 次回からこの画面を省略する</label>
+      </div>
+    </section>
+
+    <section id="permissionDialog" class="modal-backdrop" hidden>
+      <div class="modal-card paper-panel" role="dialog" aria-modal="true" aria-labelledby="permissionTitle">
+        <h2 id="permissionTitle">マイクへのアクセス</h2>
+        <p>リアルタイム可視化または録音のために使用します。録音開始は別操作で、取得した音声を自動送信しません。</p>
+        <div class="modal-actions"><button id="cancelPermissionButton" class="quiet-button" type="button">キャンセル</button><button id="confirmPermissionButton" class="primary-button" type="button">マイクを許可</button></div>
+      </div>
+    </section>
+
+    <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+    <div id="dropOverlay" class="drop-overlay" hidden><div><span class="water-drop large" aria-hidden="true"></span><strong>音声ファイルを追加</strong><small>複数ファイルに対応しています</small></div></div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
